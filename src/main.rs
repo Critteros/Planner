@@ -1,8 +1,10 @@
 mod algorithm;
 
+use std::error::Error;
 use clap::{Arg, ArgAction, Command};
 
 use crate::algorithm::data::AlgorithmConfig;
+
 
 fn main() {
     let args = Command::new("Genetic Algorithm")
