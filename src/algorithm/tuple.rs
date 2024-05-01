@@ -1,8 +1,8 @@
-use std::error::Error;
 use std::fs::File;
 use std::path::Path;
+use serde::Deserialize;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Tuple {
     id: i32,
     label: String,
@@ -10,8 +10,8 @@ struct Tuple {
     teacher: String,
 }
 
-fn read_csv(path: impl AsRef<Path>) -> Result<String, dyn Error> {
-    let mut file = File::open(path);
-    let config = serde_json::from_reader(&mut file?);
-    config
+pub fn read_csv(path: impl AsRef<Path>) -> std::io::Result<Tuple> {
+    let file = File::open(path)?;
+    let config = serde_json::from_reader(file)?;
+    Ok(config)
 }
