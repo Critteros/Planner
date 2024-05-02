@@ -10,8 +10,8 @@ use rand::{SeedableRng, Rng};
 use rand::rngs::StdRng;
 
 use clap::{Arg, ArgAction, Command};
+use serde::{Deserialize, Serialize};
 use algorithm::tuple::Tuple;
-use algorithm::data::MPITransferable;
 use algorithm::config::AlgorithmConfig;
 use crate::mpi_utils::mpi_synchronize_ref;
 
@@ -55,12 +55,26 @@ fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
 
 type Gene = i32;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Chromosome {
     id: i32,
     genes: Vec<Gene>,
 }
 
-type Individual = Vec::<Chromosome>; // add adaptation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Individual {
+    adaptation: f32,
+    chromosomes: Vec<Chromosome>,
+}
+
+impl Individual {
+    fn new(chromosomes: impl IntoIterator<Item=Chromosome>) -> Self {
+        Individual {
+            adaptation: 0.0,
+            chromosomes: chromosomes.into_iter().collect(),
+        }
+    }
+}
 
 type Population = Vec::<Individual>;
 
@@ -75,7 +89,7 @@ fn get_random_generator() -> StdRng {
 // for each individual (list of periods) in population size
 // for tuple in tuples
 // assign tuple to a random period from individual
-fn create_first_population(config: AlgorithmConfig, tuples: Vec<Tuple>) -> Population {
+fn create_first_population(config: &AlgorithmConfig, tuples: &Vec<Tuple>) -> Population {
     let population_size = usize::try_from(config.population_size).unwrap();
     let number_of_periods = usize::try_from(config.number_of_periods).unwrap();
 
@@ -84,7 +98,10 @@ fn create_first_population(config: AlgorithmConfig, tuples: Vec<Tuple>) -> Popul
     let mut rng = get_random_generator();
 
     for _ in 0..population_size {
-        let mut individual: Individual = Vec::<Chromosome>::with_capacity(number_of_periods);
+        let mut individual: Individual = Individual {
+            adaptation: 0.0,
+            chromosomes: Vec::<Chromosome>::with_capacity(number_of_periods),
+        };
 
         // create periods
         for period_id in 0..number_of_periods {
@@ -93,13 +110,13 @@ fn create_first_population(config: AlgorithmConfig, tuples: Vec<Tuple>) -> Popul
                 genes: Vec::<Gene>::new(),
             };
 
-            individual.push(period);
+            individual.chromosomes.push(period);
         }
 
         // assign tuple to a random period from individual
-        for tuple in &tuples {
+        for tuple in tuples {
             let random_period_index = rng.gen_range(0..number_of_periods);
-            individual[random_period_index].genes.push(tuple.id);
+            individual.chromosomes[random_period_index].genes.push(tuple.id);
         }
 
         population.push(individual)
@@ -108,33 +125,37 @@ fn create_first_population(config: AlgorithmConfig, tuples: Vec<Tuple>) -> Popul
     population
 }
 
-fn mutate(config: AlgorithmConfig, population: Population) {
+fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
     let population_size = usize::try_from(config.population_size).unwrap();
     let number_of_periods = usize::try_from(config.number_of_periods).unwrap();
 
     let mut rng = get_random_generator();
 
     // ToDo: add check that parent is alive
-    // xd naming for now
     let mother_index = rng.gen_range(0..population_size);
     let father_index = rng.gen_range(0..number_of_periods);
 
     let mother = &population[mother_index];
     let father = &population[father_index];
 
-    let child: Individual = Vec::<Chromosome>::with_capacity(number_of_periods);
+    let mut child: Individual = Individual {
+        adaptation: 0.0,
+        chromosomes: Vec::<Chromosome>::with_capacity(number_of_periods),
+    };
 
     // mutate genes
     for period_id in 0..number_of_periods {
-        let mother_genes = &mother[period_id].genes;
-        let father_genes = &father[period_id].genes;
+        let mother_genes = &mother.chromosomes[period_id].genes;
+        let father_genes = &father.chromosomes[period_id].genes;
 
         let mating_point_upper_bound = max(mother_genes.len(), father_genes.len());
         let mating_point = rng.gen_range(0..mating_point_upper_bound);
 
-        let child_genes = mother_genes[..mating_point].iter().cloned().chain(father_genes[mating_point..].iter().cloned()).collect();
+        let (mother_left, _) = mother_genes.split_at(mating_point);
+        let (_, father_right) = father_genes.split_at(mating_point);
+        let child_genes = mother_left.iter().chain(father_right.iter()).cloned().collect();
 
-        child[period_id] = Chromosome {
+        child.chromosomes[period_id] = Chromosome {
             id: i32::try_from(period_id).unwrap(),
             genes: child_genes,
         };
@@ -143,8 +164,40 @@ fn mutate(config: AlgorithmConfig, population: Population) {
     // at this point there could be duplicated and missing genes, so we want to fix this
 
     // repair lost
-    let mother_flatten_gens: Vec<i32> = mother.iter().flat_map(|g| g.genes).collect();
-    let father_flatten_gens: Vec<i32> = father.iter().flat_map(|g| g.genes).collect();
+    let all_genes: Vec<i32> = mother.chromosomes.iter().flat_map(|g| g.genes.iter().cloned()).collect();
+    let lost_genes: Vec<i32> = all_genes.iter().filter(|g| !child.chromosomes.iter().any(|c| c.genes.contains(g))).cloned().collect();
+
+    for gene in lost_genes {
+        let period_id = rng.gen_range(0..number_of_periods);
+        child.chromosomes[period_id].genes.push(gene);
+    }
+
+    // remove duplicates
+    let mut seen = std::collections::HashSet::new();
+
+    for period in &mut child.chromosomes {
+        period.genes.retain(|x| seen.insert(x.clone()));
+    }
+
+    child
+}
+
+fn mutate(config: &AlgorithmConfig, individual: &mut Individual) {
+    let mutation_probability = config.mutation_probability;
+    let number_of_periods = usize::try_from(config.number_of_periods).unwrap();
+
+    let mut rng = get_random_generator();
+
+    for period_id in 0..number_of_periods {
+        if rng.gen_bool(mutation_probability.into()) {
+            let period = individual.chromosomes[period_id].clone();
+            let gene_index = rng.gen_range(0..period.genes.len());
+            let gene = period.genes[gene_index];
+
+            let new_gene = rng.gen_range(0..100);
+            period.genes[gene_index] = new_gene;
+        }
+    }
 }
 
 fn main() {
@@ -162,25 +215,6 @@ fn main() {
         (config, tuples) = root_init();
     }
 
-    // let mut serialized_config = if rank == ROOT_RANK {
-    //     config.into_bytes()
-    // } else {
-    //     vec![]
-    // };
-    //
-    // let mut serialized_config_size = if rank == ROOT_RANK {
-    //     serialized_config.len()
-    // } else {
-    //     0
-    // };
-    //
-    // root_process.broadcast_into(&mut serialized_config_size);
-    //
-    // if rank != ROOT_RANK {
-    //     serialized_config = vec![0; serialized_config_size];
-    // }
-    //
-    // root_process.broadcast_into(&mut serialized_config_size);
     mpi_synchronize_ref(&mut config, &world, ROOT_RANK);
     println!("{:?}", config);
 
