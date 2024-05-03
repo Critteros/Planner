@@ -59,7 +59,7 @@ fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
 
     let mut rng = get_random_generator();
 
-    // ToDo: add check that parent is alive
+    // ToDo: add check that parent is alive, otherwise select another parent
     let mother_index = rng.gen_range(0..population_size);
     let father_index = rng.gen_range(0..number_of_periods);
 
@@ -90,8 +90,7 @@ fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
         };
     }
 
-    // at this point there could be duplicated and missing genes, so we want to fix
-    // this
+    // at this point there could be duplicated and missing genes, so we want to fix this
 
     // repair lost
     let all_genes: Vec<i32> = mother
@@ -99,6 +98,7 @@ fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
         .iter()
         .flat_map(|g| g.genes.iter().cloned())
         .collect();
+
     let lost_genes: Vec<i32> = all_genes
         .iter()
         .filter(|g| !child.chromosomes.iter().any(|c| c.genes.contains(g)))
@@ -128,12 +128,40 @@ fn mutate(config: &AlgorithmConfig, individual: &mut Individual) {
 
     for period_id in 0..number_of_periods {
         if rng.gen_bool(mutation_probability.into()) {
-            let mut period = individual.chromosomes[period_id].clone();
+            let period = &mut individual.chromosomes[period_id];
             let gene_index = rng.gen_range(0..period.genes.len());
             let gene = period.genes[gene_index];
 
-            let new_gene = rng.gen_range(0..100);
-            period.genes[gene_index] = new_gene;
+            // remove gene from period
+            period.genes.retain(|g| g != &gene);
+
+            // get random period. ToDo: make sure it's not the same period
+            let new_period_id = rng.gen_range(0..number_of_periods);
+
+            // add gene to new period
+            individual.chromosomes[new_period_id].genes.push(gene);
         }
     }
+}
+
+fn calculate_fitness(individual: &Individual, tuples: &Vec<Tuple>) -> f32 {
+    let mut fitness = 0.0;
+
+    for period in &individual.chromosomes {
+        let mut period_fitness = 0.0;
+        // if teacher is teaching more than one class at the same time decrease fitness by 10
+
+        for gene in &period.genes {
+            // if the same teacher is teaching more than one class at the same time decrease fitness by 10
+            // if different teachers occupy the same room at the same time decrease fitness by 20
+            // ToDo: split in tuples lecture type, so CWL and LAB can be in the same room at the same time
+
+            let tuple = tuples
+                .iter()
+                .find(|t| t.id == *gene)
+                .expect(format!("Tuple with id {gene} not found").as_str());
+        }
+    }
+
+    0.0
 }

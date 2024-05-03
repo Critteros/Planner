@@ -16,7 +16,7 @@ pub enum ConfigLoadError {
 /// * Individual - list of periods
 /// * Chromosome - a period of time with a list of genes (classes that are
 ///   happening at that time)
-/// * Gene - a tuple consisting of teacher, subject, room and class
+/// * Gene - an id of tuple consisting of teacher, subject, room and class
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Equivalence)]
 #[serde(default)]
 pub struct AlgorithmConfig {
