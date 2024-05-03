@@ -3,9 +3,9 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::seq::IteratorRandom;
 use rayon::prelude::*;
-use std::cmp::{max, min};
+use std::cmp::min;
 
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 use self::{
     config::AlgorithmConfig,
@@ -91,19 +91,18 @@ pub fn rand_parents(parents: &Population) -> (&Individual, &Individual) {
     );
 }
 
-use rayon::prelude::*;
 pub fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
     let AlgorithmConfig {
-        population_size,
-        number_of_periods,
-        ..
+        number_of_periods, ..
     } = config.to_owned();
 
     let (mother, father) = rand_parents(population);
 
     let mut child: Individual = Individual::with_chromosomes(
         std::iter::zip(mother.chromosomes.iter(), father.chromosomes.iter())
-            .par_bridge()
+            .collect::<Vec<_>>()
+            .par_iter()
+            // .par_bridge()
             .map(|(mother_chromosome, father_chromosome)| {
                 assert_eq!(mother_chromosome.id, father_chromosome.id);
                 let mut rng = get_random_generator();

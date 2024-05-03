@@ -1,11 +1,12 @@
+#![allow(unused_variables)]
 use clap::{Arg, ArgAction, Command};
 use mpi::{traits::*, Rank, Threading};
-use rayon::iter::IntoParallelIterator;
 
-use crate::algorithm::datatypes::{Individual, Tuple};
+use crate::algorithm::datatypes::Tuple;
 use crate::algorithm::{calculate_fitness, crossover, mutate};
 
 use self::{algorithm::config::AlgorithmConfig, mpi_utils::mpi_execute_and_synchronize_at};
+use rayon::prelude::*;
 
 mod algorithm;
 mod mpi_utils;
@@ -47,7 +48,7 @@ fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
 
     return (config, tuples);
 }
-use rayon::prelude::*;
+
 fn main() {
     let (universe, threading) = mpi::initialize_with_threading(Threading::Multiple).unwrap();
     assert_eq!(threading, mpi::environment::threading_support());

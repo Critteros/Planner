@@ -54,7 +54,7 @@ impl Default for AlgorithmConfig {
         AlgorithmConfig {
             max_generations: 100,
             population_size: 10_000,
-            number_of_periods: 8,
+            number_of_periods: 7,
             crossover_probability: 0.6,
             mutation_probability: 0.2,
             dead_threshold: 0.1,
