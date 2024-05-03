@@ -1,7 +1,9 @@
 use clap::{Arg, ArgAction, Command};
 use mpi::{traits::*, Rank, Threading};
+use rayon::iter::IntoParallelIterator;
 
-use crate::algorithm::datatypes::Tuple;
+use crate::algorithm::datatypes::{Individual, Tuple};
+use crate::algorithm::{calculate_fitness, crossover, mutate};
 
 use self::{algorithm::config::AlgorithmConfig, mpi_utils::mpi_execute_and_synchronize_at};
 
@@ -45,7 +47,7 @@ fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
 
     return (config, tuples);
 }
-
+use rayon::prelude::*;
 fn main() {
     let (universe, threading) = mpi::initialize_with_threading(Threading::Multiple).unwrap();
     assert_eq!(threading, mpi::environment::threading_support());
@@ -57,4 +59,33 @@ fn main() {
 
     let (config, tuples) = mpi_execute_and_synchronize_at(root_init, &world, ROOT_RANK);
     println!("{:?}", config);
+
+    let mut population = algorithm::create_first_population(&config, &tuples);
+
+    for generation_number in 0..config.max_generations {
+        println!("Generation: {}", generation_number + 1);
+
+        population = population
+            .par_iter()
+            .map(|_| crossover(&config, &population))
+            .map(|mut individual| {
+                mutate(&config, &mut individual);
+                individual
+            })
+            .map(|mut individual| {
+                individual.adaptation = calculate_fitness(&individual, &tuples, false);
+                individual
+            })
+            .collect();
+
+        population.sort_by(|a, b| b.adaptation.partial_cmp(&a.adaptation).unwrap());
+
+        println!("Best adaptation: {}", population[0].adaptation);
+
+        if population[0].adaptation == 0 {
+            break;
+        }
+    }
+
+    calculate_fitness(&population[0], &tuples, true);
 }

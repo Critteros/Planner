@@ -43,17 +43,33 @@ impl Tuple {
 
 pub type Gene = i32;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Individual {
-    pub adaptation: f32,
+    pub adaptation: i32,
     pub chromosomes: Vec<Chromosome>,
 }
 
 impl Individual {
     pub fn new(num_chromosomes: usize) -> Self {
         Individual {
-            adaptation: 0.0,
             chromosomes: Vec::with_capacity(num_chromosomes),
+            ..Self::default()
+        }
+    }
+
+    pub fn with_chromosomes(chromosomes: Vec<Chromosome>) -> Self {
+        Individual {
+            chromosomes,
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for Individual {
+    fn default() -> Self {
+        Individual {
+            adaptation: -1000,
+            chromosomes: Vec::new(),
         }
     }
 }
@@ -72,5 +88,28 @@ impl Chromosome {
             id,
             genes: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_value_of_individuals() {
+        let invidual = Individual::default();
+        assert_eq!(invidual.adaptation, -1000);
+        assert_eq!(invidual.chromosomes.len(), 0);
+    }
+
+    #[test]
+    fn test_individual_with_chromosomes() {
+        let chromosomes = vec![Chromosome {
+            id: 1,
+            genes: vec![1, 2, 3],
+        }];
+        let individual = Individual::with_chromosomes(chromosomes);
+        assert_eq!(individual.adaptation, -1000);
+        assert_eq!(individual.chromosomes.len(), 1);
     }
 }
