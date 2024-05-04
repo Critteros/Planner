@@ -1,5 +1,7 @@
-use mpi::{ffi::MPI_Comm, Rank, traits::*};
+use mpi::{ffi::MPI_Comm, Rank, topology::SimpleCommunicator, traits::*};
 use serde::{de::DeserializeOwned, Serialize};
+
+pub const ROOT_RANK: Rank = 0;
 
 pub trait MPITransferable: Serialize + DeserializeOwned {
     fn into_bytes(self) -> Vec<u8> {
@@ -58,4 +60,26 @@ where
 
     mpi_synchronize_ref(&mut value_placeholder, communicator, executor_rank);
     return value_placeholder;
+}
+
+pub fn mpi_split_data_across_nodes<T: Default>(
+    data: &[T],
+    communicator: &SimpleCommunicator,
+    worker_rank: Rank,
+) -> Vec<T> {
+    let size = communicator.size();
+    let rank = communicator.rank();
+    let process = communicator.process_at_rank(worker_rank);
+    let split_size = data.len() / size as usize;
+    assert_eq!(data.len() % size as usize, 0);
+
+    let mut rec_data: Vec<T> = vec![T::default(); split_size];
+
+    if rank == worker_rank {
+        process.scatter_into_root(&data, &mut rec_data);
+    } else {
+        process.scatter_into(&mut rec_data);
+    }
+
+    rec_data
 }

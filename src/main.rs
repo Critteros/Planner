@@ -1,17 +1,23 @@
 #![allow(unused_variables)]
+
 use clap::{Arg, ArgAction, Command};
-use mpi::{traits::*, Rank, Threading};
-
-use crate::algorithm::datatypes::Tuple;
-use crate::algorithm::{calculate_fitness, crossover, mutate};
-
-use self::{algorithm::config::AlgorithmConfig, mpi_utils::mpi_execute_and_synchronize_at};
+use mpi::{Threading, traits::*};
 use rayon::prelude::*;
+
+use crate::{algorithm::datatypes::Tuple, mpi_utils::mpi_split_data_across_nodes};
+
+use clap::{Arg, ArgAction, Command};
+use mpi::{traits::*, Threading};
+use rayon::prelude::*;
+
+use self::{
+    algorithm::config::AlgorithmConfig,
+    mpi_utils::{mpi_execute_and_synchronize_at, ROOT_RANK},
+};
+use crate::{algorithm::datatypes::Tuple, mpi_utils::mpi_split_data_across_nodes};
 
 mod algorithm;
 mod mpi_utils;
-
-const ROOT_RANK: Rank = 0;
 
 fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
     let args = Command::new("Genetic Algorithm")
@@ -58,35 +64,50 @@ fn main() {
     let size = world.size();
     let rank = world.rank();
 
-    let (config, tuples) = mpi_execute_and_synchronize_at(root_init, &world, ROOT_RANK);
+    let (mut config, tuples) = mpi_execute_and_synchronize_at(root_init, &world, ROOT_RANK);
+    if config.population_size % size as usize != 0 {
+        config.population_size += size as usize - (config.population_size % size as usize);
+        println!(
+            "Changing population size to {}, to match node number",
+            config.population_size
+        )
+    }
+
     println!("{:?}", config);
 
     let mut population = algorithm::create_first_population(&config, &tuples);
+    let population_work_size = mpi_split_data_across_nodes(&population, &world, ROOT_RANK);
+    println!(
+        "Population len: {}, Work size len: {}",
+        population.len(),
+        population_work_size.len()
+    );
 
-    for generation_number in 0..config.max_generations {
-        println!("Generation: {}", generation_number + 1);
-
-        population = population
-            .par_iter()
-            .map(|_| crossover(&config, &population))
-            .map(|mut individual| {
-                mutate(&config, &mut individual);
-                individual
-            })
-            .map(|mut individual| {
-                individual.adaptation = calculate_fitness(&individual, &tuples, false);
-                individual
-            })
-            .collect();
-
-        population.sort_by(|a, b| b.adaptation.partial_cmp(&a.adaptation).unwrap());
-
-        println!("Best adaptation: {}", population[0].adaptation);
-
-        if population[0].adaptation == 0 {
-            break;
-        }
-    }
-
-    calculate_fitness(&population[0], &tuples, true);
+    // for generation_number in 0..config.max_generations {
+    //     println!("Generation: {}", generation_number + 1);
+    //
+    //     population = population
+    //         .par_iter()
+    //         .map(|_| crossover(&config, &population))
+    //         .map(|mut individual| {
+    //             mutate(&config, &mut individual);
+    //             individual
+    //         })
+    //         .map(|mut individual| {
+    //             individual.adaptation = calculate_fitness(&individual,
+    // &tuples, false);             individual
+    //         })
+    //         .collect();
+    //
+    //     population.sort_by(|a, b|
+    // b.adaptation.partial_cmp(&a.adaptation).unwrap());
+    //
+    //     println!("Best adaptation: {}", population[0].adaptation);
+    //
+    //     if population[0].adaptation == 0 {
+    //         break;
+    //     }
+    // }
+    //
+    // calculate_fitness(&population[0], &tuples, true);
 }

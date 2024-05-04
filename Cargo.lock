@@ -473,6 +473,7 @@ dependencies = [
  "clap",
  "csv",
  "itertools",
+ "log",
  "mpi",
  "rand",
  "rayon",
