@@ -11,6 +11,20 @@ pub enum TuplesLoadError {
     Csv(#[from] csv::Error),
 }
 
+/// Tuple
+///
+/// Defined by:
+///
+/// > Abramson, D., & Abela, J. (1992). A Parallel Genetic Algorithm for Solving the School Timetabling Problem.
+/// > High Performance Computation Project, Division of Information Technology, C.S.I.R.O., 723 Swanston St,
+/// > Carlton, 3053, Australia.
+///
+/// as the unit (gene) containing the information about a class.
+/// As described by the paper the timetable prooblem can be divided into 2 subproblems:
+/// 1. Creating tuples. Assigning persons to groups.
+/// 2. Creating timetable == assigning tuples to periods (finding the best timetable). One that
+/// doesn't introduce collisions. The cost function can be adapted to any requiremenets,
+/// for example, taking into account the teacher's preferences.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, Eq, PartialEq, Hash)]
 pub struct Tuple {
     pub id: i32,
@@ -41,8 +55,11 @@ impl Tuple {
     }
 }
 
+/// Gene is [`Tuple::id`]. Used internally to minimize the size of the data being sent/copied. For example,
+/// crossover can operate only on the ids of the tuples.
 pub type Gene = i32;
 
+/// Individual is a timetable. It has adaptation value and a list of chromosomes = periods.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Individual {
     pub adaptation: i32,
@@ -74,8 +91,11 @@ impl Default for Individual {
     }
 }
 
+/// Population is a list of timetables = individuals.
 pub type Population = Vec<Individual>;
 
+/// Chromosome is a period. Period contains a start and end time, but for algorithm purposes,
+/// we are only interested in their number.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Chromosome {
     pub id: i32,

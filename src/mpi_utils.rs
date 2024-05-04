@@ -1,12 +1,23 @@
 use mpi::{ffi::MPI_Comm, traits::*, Rank};
+use rayon::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
+/// Rank of the root process (data owner)
 pub const ROOT_RANK: Rank = 0;
 
+/// Trait for types that can be transferred over MPI as bytes
+///
+/// Utilizes bincode instead of serde_cbor because cbor
+/// 'compresses' the data. For example int field can have different size when serialized.
+/// In our case, we need to have the same size of data on all nodes to be able to scatter
+/// and gather it.
 pub trait MPITransferable: Serialize + DeserializeOwned {
+    /// Serialize the object into a byte vector
     fn into_bytes(self) -> Vec<u8> {
         bincode::serialize(&self).unwrap()
     }
+    
+    /// Deserialize the object from a byte vector
     fn from_bytes(bytes: &[u8]) -> Self {
         bincode::deserialize(bytes).unwrap()
     }
@@ -61,8 +72,10 @@ where
     mpi_synchronize_ref(&mut value_placeholder, communicator, executor_rank);
     return value_placeholder;
 }
-use rayon::prelude::*;
 
+/// Serialize a vector of MPITransferable objects into a single byte vector
+///
+/// Helper method for [`mpi_split_data_across_nodes`] and [`mpi_gather_and_synchronize`]
 fn serialize_vec<T: Default + MPITransferable + Clone + Send>(data: Vec<T>) -> (usize, Vec<u8>) {
     let serialized_data: Vec<Vec<u8>> = data.into_par_iter().map(|x| x.into_bytes()).collect();
 
@@ -79,6 +92,9 @@ fn serialize_vec<T: Default + MPITransferable + Clone + Send>(data: Vec<T>) -> (
     (data_size, serialized_data)
 }
 
+/// Split data in a vector across all nodes evenly
+///
+/// Expects `T` elements to be the same size when serialized
 pub fn mpi_split_data_across_nodes<T: Default + MPITransferable + Clone + Send>(
     data: &[T],
     communicator: &impl Communicator<Raw = MPI_Comm>,
@@ -91,7 +107,7 @@ pub fn mpi_split_data_across_nodes<T: Default + MPITransferable + Clone + Send>(
     let split_size = data.len() / size as usize;
     assert_eq!(data.len() % size as usize, 0);
 
-    let mut rec_data: Vec<u8> = Vec::new();
+    let mut rec_data: Vec<u8>;
     let mut data_size = 0;
 
     if rank == data_owner_rank {
@@ -115,6 +131,9 @@ pub fn mpi_split_data_across_nodes<T: Default + MPITransferable + Clone + Send>(
         .collect()
 }
 
+/// Gather data (shards of split data) from all nodes into a single vector
+///
+/// Expects `T` elements to be the same size when serialized
 pub fn mpi_gather_and_synchronize<T: Default + MPITransferable + Clone + Send>(
     gather_from: &[T],
     communicator: &impl Communicator<Raw = MPI_Comm>,

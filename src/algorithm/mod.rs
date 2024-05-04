@@ -210,9 +210,12 @@ pub fn calculate_fitness(individual: &Individual, tuples: &Vec<Tuple>, debug: bo
         let genes = &period.genes;
 
         for gene_id in genes {
-            // if the same teacher is teaching more than one class at the same time decrease fitness by 10
+            // if the same teacher is teaching more than one class at the same time decrease fitness by 10,
             // if different teachers occupy the same room at the same time decrease fitness by 20
-            // ToDo: consider splitting tuples lecture type, so CWL and LAB can be in the same room at the same time
+
+            // additional rules may be added, for example,
+            // the division of lectures by type of classes, if the types of classes differ for the
+            // same lecture, reduce the suitability by a smaller value
 
             let tuple = tuples
                 .iter()
