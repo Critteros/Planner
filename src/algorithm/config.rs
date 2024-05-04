@@ -29,14 +29,8 @@ pub struct AlgorithmConfig {
     /// How many genes are in each chromosome. Chromosome length
     pub number_of_periods: usize,
 
-    /// The probability of crossover occurring
-    pub crossover_probability: f32,
-
     /// The probability of mutation occurring
     pub mutation_probability: f32,
-
-    /// If child adaptation is worse than threshold - child is dead
-    pub dead_threshold: f32,
 }
 
 impl AlgorithmConfig {
@@ -55,9 +49,7 @@ impl Default for AlgorithmConfig {
             max_generations: 100,
             population_size: 10_000,
             number_of_periods: 7,
-            crossover_probability: 0.6,
-            mutation_probability: 0.2,
-            dead_threshold: 0.1,
+            mutation_probability: 0.01,
         }
     }
 }

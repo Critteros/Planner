@@ -56,6 +56,8 @@ pub fn create_first_population(config: &AlgorithmConfig, tuples: &[Tuple]) -> Po
 }
 
 pub fn rand_parents(parents: &Population) -> (&Individual, &Individual) {
+    assert!(parents.len() > 1);
+
     let mut rng = get_random_generator();
 
     let sorted_parents = parents
@@ -64,15 +66,14 @@ pub fn rand_parents(parents: &Population) -> (&Individual, &Individual) {
         .collect::<Vec<_>>();
 
     let weights = (0..sorted_parents.len())
-        .map(|x| f64::exp((-0.03f64 * x as f64) + 2f64))
+        .map(|x| f64::exp((-0.3f64 * x as f64) + 2f64))
         .collect::<Vec<_>>();
 
     let dist = WeightedIndex::new(weights.clone()).unwrap();
 
     let idx1 = dist.sample(&mut rng);
 
-    // Sample the second index ensuring it's different from the first
-    // ToDo: validate user configuration to have more than 1 individual in the population
+    // Sample the second index ensuring its different from the first
     let idx2 = loop {
         let idx = dist.sample(&mut rng);
         if idx != idx1 {
