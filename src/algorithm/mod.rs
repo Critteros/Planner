@@ -17,9 +17,11 @@ pub mod config;
 pub mod datatypes;
 mod random;
 
-/// for each individual (list of periods) in population size
-/// for tuple in tuples
-/// assign tuple to a random period from individual
+/// Create a first population
+///
+/// Create a population of size `population_size` with each individual having `number_of_periods`
+/// periods.
+/// Then assign tuple to a random period of individual
 pub fn create_first_population(config: &AlgorithmConfig, tuples: &[Tuple]) -> Population {
     let AlgorithmConfig {
         population_size,
@@ -55,6 +57,20 @@ pub fn create_first_population(config: &AlgorithmConfig, tuples: &[Tuple]) -> Po
     population
 }
 
+/// Get parents from the current population
+///
+/// Can't use roulette wheel selection because the population is big but
+/// wheel selections sums up all the adaptation function values and calculates the probability
+/// of each individual being selected as adaptation / sum of all adaptations.
+/// When population is big the sum of all adaptations is big and the probability of
+/// each individual being selected is very small. In practise this means that
+/// less adapted individuals are selected with relatively high probability.
+///
+/// Instead, we sort the population by adaptation descending.
+/// Then we apply exponent function (a * e^x + b) to the index of the individual in the sorted population.
+/// Controlling the a and b parameters we can control the probability of selecting the individual.
+/// Current values are selected by trial and error.
+/// Then we apply roulette wheel selection to select the parents making sure that the parents are different.
 pub fn rand_parents(parents: &Population) -> (&Individual, &Individual) {
     assert!(parents.len() > 1);
 
@@ -92,6 +108,16 @@ pub fn rand_parents(parents: &Population) -> (&Individual, &Individual) {
     );
 }
 
+/// Crossover two parents to create a child
+///
+/// We are choosing random parents from the readonly current population. Then for each corresponding
+/// period we are choosing a gene mating point and creating a child by combining the genes from the parents.
+/// Then we need to solve 2 potential problems:
+/// 1. Missing genes. To solve it we are adding missing genes to the random period.
+/// 2. Duplicated genes. To solve it we are removing duplicated genes from the periods.
+///
+/// There is most likely a bug in Rust or Rayon as when we use par_bridge instead of (collect, par_iter)
+/// the assert fails meaning it selects items from `mother` and `father` in different order.
 pub fn crossover(config: &AlgorithmConfig, population: &Population) -> Individual {
     let AlgorithmConfig {
         number_of_periods, ..
@@ -165,6 +191,14 @@ pub fn crossover(config: &AlgorithmConfig, population: &Population) -> Individua
     child
 }
 
+/// Mutate the individual
+///
+/// Typically, mutation probability determines the probability of individual mutation.
+/// In this case, mutation probability determines the probability of chromosome mutation, so it is
+/// good idea to keep it small.
+///
+/// For each period, we are checking if the mutation should occur. If it should, we are removing
+/// a random gene from the period and adding it to a random period.
 pub fn mutate(config: &AlgorithmConfig, individual: &mut Individual) {
     let mutation_probability = config.mutation_probability;
     let number_of_periods = usize::try_from(config.number_of_periods).unwrap();
@@ -201,6 +235,11 @@ pub fn mutate(config: &AlgorithmConfig, individual: &mut Individual) {
     }
 }
 
+/// Calculate fitness of the individual
+///
+/// For every period in individual we are checking 2 rules:
+/// 1) If the same teacher is teaching more than one class at the same time decrease fitness by 10
+/// 2) If different teachers occupy the same room at the same time decrease fitness by 20
 pub fn calculate_fitness(individual: &Individual, tuples: &Vec<Tuple>, debug: bool) -> i32 {
     let mut individual_fitness = 0;
 
