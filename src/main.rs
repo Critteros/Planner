@@ -11,8 +11,11 @@ use crate::algorithm::{calculate_fitness, crossover, mutate};
 use crate::mpi_utils::mpi_gather_and_synchronize;
 use crate::{algorithm::datatypes::Tuple, mpi_utils::mpi_split_data_across_nodes};
 
+/// For more details, see the [PDF documentation](../Dokumentacja.pdf).
 mod algorithm;
 mod mpi_utils;
+
+
 
 /// Read the configuration and tuples from the command line arguments
 fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
@@ -68,6 +71,7 @@ fn adapt_population_size_to_worker_number(population_size: usize, rank: Rank, si
 
     new_population_size
 }
+
 
 fn main() {
     let (universe, threading) = mpi::initialize_with_threading(Threading::Multiple).unwrap();
