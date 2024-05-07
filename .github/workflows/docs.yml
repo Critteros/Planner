@@ -34,7 +34,7 @@ jobs:
       - name: Remove lock file
         run: rm target/doc/.lock
       - name: Copy PDF documentation
-        run: cp ./Dokumentacja.pdf target/doc/planner/.
+        run: cp ./Dokumentacja.pdf target/doc/.
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

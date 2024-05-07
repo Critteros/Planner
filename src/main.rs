@@ -16,7 +16,6 @@ mod algorithm;
 mod mpi_utils;
 
 
-
 /// Read the configuration and tuples from the command line arguments
 fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
     let args = Command::new("Genetic Algorithm")
