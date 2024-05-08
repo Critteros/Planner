@@ -261,26 +261,43 @@ pub fn calculate_fitness(individual: &Individual, tuples: &Vec<Tuple>, debug: bo
                 .find(|t| t.id == *gene_id)
                 .expect(format!("Tuple with id {} not found", *gene_id).as_str());
 
-            let this_room_classes = tuples
+            let other_classes = tuples
                 .iter()
                 .filter(|t| genes.contains(&t.id))
-                .filter(|t| t.id != tuple.id)
-                .filter(|t| t.room == tuple.room);
+                .filter(|t| t.id != tuple.id);
 
             // get count of tuples with the same teacher
-            let same_teacher_different_classes_count = this_room_classes
+            let same_teacher_different_classes_count = other_classes
                 .clone()
+                .filter(|t| t.room == tuple.room)
                 .filter(|t| t.teacher == tuple.teacher)
                 .count();
 
             individual_fitness -= (same_teacher_different_classes_count as i32) * 10;
 
-            let same_room_different_teacher_count = this_room_classes
+            let same_room_different_teacher_count = other_classes
                 .clone()
+                .filter(|t| t.room == tuple.room)
                 .filter(|t| t.teacher != tuple.teacher)
                 .count();
 
             individual_fitness -= (same_room_different_teacher_count as i32) * 20;
+
+            let same_teacher_same_subject_count = other_classes
+                .clone()
+                .filter(|t| t.teacher == tuple.teacher)
+                .filter(|t| t.label == tuple.label)
+                .count();
+
+            individual_fitness -= (same_teacher_same_subject_count as i32) * 10;
+
+            let same_teacher_different_subject_count = other_classes
+                .clone()
+                .filter(|t| t.teacher == tuple.teacher)
+                .filter(|t| t.label != tuple.label)
+                .count();
+
+            individual_fitness -= (same_teacher_different_subject_count as i32) * 20;
 
             if debug {
                 println!(

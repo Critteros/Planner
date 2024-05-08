@@ -48,8 +48,8 @@ impl Default for AlgorithmConfig {
         AlgorithmConfig {
             max_generations: 100,
             population_size: 10_000,
-            number_of_periods: 7,
-            mutation_probability: 0.01,
+            number_of_periods: 8,
+            mutation_probability: 0.05,
         }
     }
 }

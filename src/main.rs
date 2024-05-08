@@ -1,6 +1,9 @@
 use clap::{Arg, ArgAction, Command};
+use itertools::Itertools;
 use mpi::{traits::*, Rank, Threading};
 use rayon::prelude::*;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 use self::{
     algorithm::config::AlgorithmConfig,
@@ -14,7 +17,6 @@ use crate::{algorithm::datatypes::Tuple, mpi_utils::mpi_split_data_across_nodes}
 /// For more details, see the [PDF documentation](../Dokumentacja.pdf).
 mod algorithm;
 mod mpi_utils;
-
 
 /// Read the configuration and tuples from the command line arguments
 fn root_init() -> (AlgorithmConfig, Vec<Tuple>) {
@@ -71,7 +73,6 @@ fn adapt_population_size_to_worker_number(population_size: usize, rank: Rank, si
     new_population_size
 }
 
-
 fn main() {
     let (universe, threading) = mpi::initialize_with_threading(Threading::Multiple).unwrap();
     assert_eq!(threading, mpi::environment::threading_support());
@@ -117,14 +118,38 @@ fn main() {
 
         // early stop, print results
         if rank == ROOT_RANK {
-            println!(
-                "Best adaptation: {}",
-                population_to_be_processed[0].adaptation
-            );
-
-            if population_to_be_processed[0].adaptation == 0 {
-                break;
-            }
+            println!("Best adaptation: {}", population[0].adaptation);
         }
+        if population[0].adaptation == 0 {
+            break;
+        }
+    }
+
+    if rank == ROOT_RANK {
+        let best_individual = &population[0];
+        println!("Best adaptation: {}", best_individual.adaptation);
+        let out_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("timetable.txt")
+            .expect("Could not open file");
+
+        let mut buf_writer = std::io::BufWriter::new(out_file);
+        writeln!(buf_writer, "Najlepszy plan zajęć").expect("Could not write to file");
+
+        best_individual
+            .chromosomes
+            .iter()
+            .enumerate()
+            .for_each(|(index, chromosome)| {
+                let mapped_tuples = chromosome
+                    .genes
+                    .iter()
+                    .map(|gene| tuples.iter().find(|tuple| tuple.id == *gene).unwrap());
+                let tuples_as_string = mapped_tuples.map(|tuple| tuple.to_string()).join("\n - ");
+                writeln!(buf_writer, "{}:\n - {}", index + 1, tuples_as_string)
+                    .expect("Could not write to file");
+            });
     }
 }

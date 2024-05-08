@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::{fs::File, path::Path};
 
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,16 @@ pub struct Tuple {
     pub label: String,
     pub room: String,
     pub teacher: String,
+}
+
+impl Display for Tuple {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            format!("{}, {}, {}", self.label, self.room, self.teacher)
+        )
+    }
 }
 
 impl Tuple {
